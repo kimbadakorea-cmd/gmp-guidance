@@ -72,6 +72,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .prog { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.7rem; font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .prog b { color: var(--ink); font-weight: 700; }
 .prog .rem b { color: var(--stamp); }
+.prog .scope { color: var(--accent); font-weight: 700; }
 .meter { flex: 1 1 4rem; height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; min-width: 3rem; }
 .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
 @media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
@@ -221,10 +222,11 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
     <div class="warn" id="store-warn" hidden>이 브라우저는 입력한 답을 저장하지 못합니다. 시크릿(비공개) 창이 아닌 일반 창에서 열어 주세요.</div>
     <div class="prog" aria-live="polite">
       <span class="who" id="p-name" hidden></span>
-      <span>채운 빈칸 <b id="p-fill">0</b></span>
-      <span class="rem">남은 빈칸 <b id="p-rem">0</b></span>
-      <span class="bad">틀린 빈칸 <b id="p-wrong">0</b></span>
-      <span class="meter" aria-hidden="true"><i id="p-bar"></i></span>
+      <span class="pc scope" id="p-scope">전체</span>
+      <span class="pc">채운 빈칸 <b id="p-fill">0</b></span>
+      <span class="pc rem">남은 빈칸 <b id="p-rem">0</b></span>
+      <span class="pc bad">틀린 빈칸 <b id="p-wrong">0</b></span>
+      <span class="pc meter" aria-hidden="true"><i id="p-bar"></i></span>
     </div>
   </div>
 </header>
@@ -363,6 +365,7 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
     var e = document.getElementById("p-name");
     e.textContent = store.name;
     e.hidden = !store.name;
+    setProgVisibility();
   }
   function nameField(idSuffix, withNeed) {
     var box = el("div", "namebox");
@@ -385,11 +388,25 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
   }
 
   // ---------- counters ----------
+  // "all" on the home screen, a lesson number on a worksheet, null elsewhere (counts hidden)
+  var SCOPE = "all";
+  function setProgVisibility() {
+    var show = SCOPE !== null;
+    Array.prototype.forEach.call(document.querySelectorAll(".prog .pc"), function (e) { e.hidden = !show; });
+    document.querySelector(".prog").hidden = !show && !store.name;
+  }
   function updateCounts() {
     var f = filledAll();
-    document.getElementById("p-fill").textContent = NF.format(f);
-    document.getElementById("p-rem").textContent = NF.format(TOTAL - f);
-    document.getElementById("p-bar").style.width = (TOTAL ? (100 * f / TOTAL) : 0).toFixed(2) + "%";
+    setProgVisibility();
+    if (SCOPE !== null) {
+      var tf, tt, tw;
+      if (SCOPE === "all") { tf = f; tt = TOTAL; tw = wrongAll(); document.getElementById("p-scope").textContent = "전체"; }
+      else { tf = filledIn(SCOPE); tt = totals[SCOPE]; tw = wrongIn(SCOPE); document.getElementById("p-scope").textContent = SCOPE + "차시"; }
+      document.getElementById("p-fill").textContent = NF.format(tf);
+      document.getElementById("p-rem").textContent = NF.format(tt - tf);
+      document.getElementById("p-wrong").textContent = NF.format(tw);
+      document.getElementById("p-bar").style.width = (tt ? (100 * tf / tt) : 0).toFixed(2) + "%";
+    }
     var lf = document.getElementById("l-fill");
     if (lf) {
       var no = +lf.getAttribute("data-l"), x = filledIn(no);
@@ -398,12 +415,11 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
     }
     var hf = document.getElementById("h-fill");
     if (hf) { hf.textContent = NF.format(f); document.getElementById("h-rem").textContent = NF.format(TOTAL - f); }
-    var wa = wrongAll();
-    document.getElementById("p-wrong").textContent = NF.format(wa);
     var hw = document.getElementById("h-wrong");
-    if (hw) hw.textContent = NF.format(wa);
+    if (hw) hw.textContent = NF.format(wrongAll());
     var lw = document.getElementById("l-wrong");
     if (lw) lw.textContent = NF.format(wrongIn(+lw.getAttribute("data-l")));
+    measureBar();
   }
 
   // ---------- paragraph rendering ----------
@@ -492,6 +508,7 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
   function setWhere(t) { document.getElementById("where").textContent = t ? "· " + t : ""; }
 
   function showHome() {
+    SCOPE = "all";
     setWhere("");
     app.innerHTML = "";
     var f = filledAll();
@@ -594,6 +611,7 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
     rs.appendChild(el("span", null, "입력한 답은 이 기기의 브라우저에 자동 저장됩니다. 아이폰은 사파리 공유 버튼 → '홈 화면에 추가'로 열면 저장이 더 오래 유지됩니다."));
     app.appendChild(rs);
     app.appendChild(el("p", "source", "출처: 식품의약품안전처 의약품품질과, 「완제의약품 제조 및 품질관리기준 가이던스(민원인 안내서)」 제3개정판, 2021. 6. 9. 규정 원문과 해설만 옮겼으며 참고자료는 제외했습니다."));
+    updateCounts();
     settle();
   }
 
@@ -607,6 +625,7 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
     var ls = L[no - 1];
     if (!ls) { showHome(); return; }
     store.last = no; save();
+    SCOPE = no;
     setWhere(no + "차시");
     app.innerHTML = "";
     var ctx = { lesson: no, k: 0 };
@@ -707,6 +726,7 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
   function quizOf(ch) { for (var i = 0; i < DATA.quiz.length; i++) if (DATA.quiz[i].ch === ch) return DATA.quiz[i]; return null; }
 
   function showQuizHome() {
+    SCOPE = null; updateCounts();
     setWhere("형성평가");
     app.innerHTML = "";
     var b = el("section", "block");
@@ -748,6 +768,7 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
   function showQuiz(ch, keepScroll) {
     var q = quizOf(ch);
     if (!q) { showQuizHome(); return; }
+    SCOPE = null; updateCounts();
     setWhere("형성평가 " + ch + "장");
     app.innerHTML = "";
     var b = el("section", "block");
