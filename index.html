@@ -209,6 +209,8 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
 .namebox .need { font-size: 0.82rem; color: var(--stamp); font-weight: 600; }
 .prog .who { color: var(--ink); font-weight: 700; max-width: 6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score .who { font-weight: 700; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.score .sendhint { flex-basis: 100%; margin: 0; }
 .warn { background: var(--bad-soft); color: var(--ink); font-size: 0.8rem; line-height: 1.45; padding: 0.4rem 0.6rem; border-radius: 0.35rem; }
 </style>
 
@@ -848,9 +850,23 @@ button.toc-row:hover .t { text-decoration-color: var(--accent); color: var(--acc
       s1.appendChild(el("div", "big", res.score + " / " + q.qs.length));
       s1.appendChild(el("div", "hint", (res.name ? res.name + " · " : "") + ch + ". " + q.t + (res.at ? " · " + res.at : "")));
       sc.appendChild(s1);
-      var again = el("button", "btn primary", "다시 풀기"); again.type = "button";
-      again.addEventListener("click", function () { delete store.qres[ch]; store.quiz[ch] = {}; save(); showQuiz(ch); });
-      sc.appendChild(again);
+      // results go to the teacher as a text message (the phone's SMS app opens pre-filled)
+      var given = store.quiz[ch] || {};
+      var lines = ["[GMP 가이던스 형성평가 결과]",
+                   "이름: " + (res.name || store.name || "미입력"),
+                   ch + ". " + q.t + " · " + res.score + "/" + q.qs.length + "점",
+                   "채점: " + (res.at || "")];
+      q.qs.forEach(function (item, i) {
+        var my = String(given[i] || "").trim();
+        if (res.marks[i]) lines.push((i + 1) + "번 정답 (" + item.a[0] + ")");
+        else lines.push((i + 1) + "번 오답 (쓴 답: " + (my || "빈칸") + " / 정답: " + item.a[0] + ")");
+      });
+      var send = document.createElement("a");
+      send.className = "btn primary";
+      send.textContent = "결과 보내기";
+      send.href = "sms:01035391479?&body=" + encodeURIComponent(lines.join("\n"));
+      sc.appendChild(send);
+      sc.appendChild(el("p", "hint sendhint", "휴대폰에서 누르면 문자 앱이 열리고 받는 사람과 결과 내용이 채워집니다. 문자 앱에서 전송을 눌러야 보내집니다."));
       b.appendChild(sc);
     }
 
